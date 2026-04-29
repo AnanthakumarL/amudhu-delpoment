@@ -1,0 +1,24 @@
+# Node
+node_modules/
+
+# Local env — never commit secrets (OpenAI, Gemini, Anthropic keys)
+.env
+.env.local
+.env.production
+
+# WhatsApp session credentials — sensitive, device-specific
+auth_info/
+auth_info_baileys/
+
+# Persisted runtime data (chat logs, whitelist, stats)
+data/
+
+# Logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
