@@ -4,6 +4,7 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   isJidBroadcast,
+  downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import qrcode from "qrcode-terminal";
@@ -147,7 +148,7 @@ export class WhatsAppClient extends EventEmitter {
       text = content.videoMessage.caption || "";
       mediaType = "video";
     } else if (content.audioMessage) {
-      mediaType = "audio";
+      mediaType = content.audioMessage.ptt ? "voice" : "audio";
     } else if (content.documentMessage) {
       text = content.documentMessage.fileName || "";
       mediaType = "document";
@@ -170,6 +171,11 @@ export class WhatsAppClient extends EventEmitter {
         : new Date().toISOString(),
       raw: msg,
     };
+  }
+
+  async downloadAudio(rawMsg) {
+    const buffer = await downloadMediaMessage(rawMsg, "buffer", {}, { logger });
+    return buffer;
   }
 
   async sendMessage(to, text) {

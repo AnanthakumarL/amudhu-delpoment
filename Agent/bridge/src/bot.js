@@ -27,30 +27,45 @@ const BRIDGE_ENDPOINT = `${AGENT_URL}/webhook/bridge`;
 
 const inFlight = new Set();
 
-async function forwardToAgent(phone, text) {
+async function forwardToAgent(phone, text, audioBase64 = null, mimeType = null) {
+  const body = { phone, message: text || "" };
+  if (audioBase64) {
+    body.audio_base64 = audioBase64;
+    body.audio_mime = mimeType || "audio/ogg; codecs=opus";
+  }
   const res = await fetch(BRIDGE_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, message: text }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Agent ${res.status}: ${await res.text()}`);
   return await res.json();
 }
 
 async function handleMessage(wa, msg) {
-  if (!msg.text) return;
+  const isVoice = msg.mediaType === "voice" || msg.mediaType === "audio";
+  if (!msg.text && !isVoice) return;
   if (inFlight.has(msg.id)) return;
   inFlight.add(msg.id);
 
   const phone = msg.from.replace(/[^0-9]/g, "");
-  const text = msg.text.trim();
 
   try {
     const tag = msg.isLid ? `${phone} (LID-only)` : phone;
-    console.error(`\n📨 [${tag}] ${text.substring(0, 120)}`);
     await wa.sock.sendPresenceUpdate("composing", msg.jid).catch(() => {});
 
-    const data = await forwardToAgent(phone, text);
+    let data;
+    if (isVoice) {
+      console.error(`\n🎤 [${tag}] Voice message received — transcribing...`);
+      const audioBuffer = await wa.downloadAudio(msg.raw);
+      const audioBase64 = audioBuffer.toString("base64");
+      const mimeType = msg.raw.message?.audioMessage?.mimetype || "audio/ogg; codecs=opus";
+      data = await forwardToAgent(phone, null, audioBase64, mimeType);
+    } else {
+      const text = msg.text.trim();
+      console.error(`\n📨 [${tag}] ${text.substring(0, 120)}`);
+      data = await forwardToAgent(phone, text);
+    }
 
     const rawMessages = Array.isArray(data.messages) && data.messages.length
       ? data.messages
